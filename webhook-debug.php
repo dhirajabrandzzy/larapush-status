@@ -12,15 +12,40 @@ $logDeployments = true; // Set to true to log deployment attempts
 // The path to your .env file
 $envFilePath = __DIR__ . '/.env';
 
+debugLog("DEBUG: Looking for .env file at: " . $envFilePath);
+debugLog("DEBUG: Current directory: " . __DIR__);
+
 // Check if the .env file exists
 if (!file_exists($envFilePath)) {
+    debugLog("ERROR: .env file does not exist at: " . $envFilePath);
+    debugLog("DEBUG: Files in current directory:");
+    $files = scandir(__DIR__);
+    foreach ($files as $file) {
+        debugLog("  - " . $file);
+    }
     http_response_code(500);
     die('Webhook not configured properly - .env file missing');
 }
 
+debugLog("DEBUG: .env file exists");
+
+// Check file permissions
+$perms = fileperms($envFilePath);
+debugLog("DEBUG: .env file permissions: " . sprintf('%o', $perms));
+debugLog("DEBUG: File readable by web server: " . (is_readable($envFilePath) ? 'YES' : 'NO'));
+
 // Read and parse the .env file
+debugLog("DEBUG: Reading .env file...");
+$envRawContent = file_get_contents($envFilePath);
+debugLog("DEBUG: Raw .env content length: " . strlen($envRawContent));
+debugLog("DEBUG: Raw .env content (first 100 chars): " . substr($envRawContent, 0, 100));
+
 $envVars = parse_ini_file($envFilePath, false, INI_SCANNER_RAW);
+debugLog("DEBUG: Parsed env vars count: " . count($envVars));
+debugLog("DEBUG: Available env vars: " . implode(', ', array_keys($envVars)));
+
 $github_webhook_secret = $envVars['GITHUB_WEBHOOK_SECRET'] ?? '';
+debugLog("DEBUG: Retrieved secret length: " . strlen($github_webhook_secret));
 
 function debugLog($message)
 {
