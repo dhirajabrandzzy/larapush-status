@@ -1,0 +1,180 @@
+<?php
+
+// Debug webhook handler for GitHub deployments to status.larapush.com
+// This version includes detailed logging to help debug signature issues
+
+// Administrative variables for enabling/disabling functionalities
+$enableGithubAuthentication = true; // Set to false to disable GitHub authentication
+$enableGitPull = true; // Set to false to disable git pull
+$enableCacheClear = true; // Set to false to disable clearing proxy cache
+$logDeployments = true; // Set to true to log deployment attempts
+
+// The path to your .env file
+$envFilePath = __DIR__ . '/.env';
+
+// Check if the .env file exists
+if (!file_exists($envFilePath)) {
+    http_response_code(500);
+    die('Webhook not configured properly - .env file missing');
+}
+
+// Read and parse the .env file
+$envVars = parse_ini_file($envFilePath, false, INI_SCANNER_RAW);
+$github_webhook_secret = $envVars['GITHUB_WEBHOOK_SECRET'] ?? '';
+
+function debugLog($message)
+{
+    $timestamp = date('Y-m-d H:i:s');
+    $logFile = __DIR__ . '/debug.log';
+    $debugMessage = "[{$timestamp}] {$message}\n";
+    
+    // Also output to response (for debugging)
+    echo $debugMessage;
+    
+    // Log to file
+    file_put_contents($logFile, $debugMessage, FILE_APPEND | LOCK_EX);
+}
+
+function verifyGithubWebhookSignature($secret)
+{
+    debugLog("DEBUG: Starting signature verification");
+    debugLog("DEBUG: Secret length: " . strlen($secret));
+    
+    if (empty($secret)) {
+        debugLog("ERROR: Empty secret in .env file");
+        return false;
+    }
+    
+    $payload = file_get_contents('php://input');
+    debugLog("DEBUG: Payload length: " . strlen($payload));
+    
+    $signatureHeader = $_SERVER['HTTP_X_HUB_SIGNATURE_256'] ?? '';
+    debugLog("DEBUG: Signature header: " . $signatureHeader);
+    
+    if (empty($signatureHeader)) {
+        debugLog("ERROR: Missing X-Hub-Signature-256 header");
+        return false;
+    }
+
+    // GitHub sends the hash signature with prefix 'sha256=', so we need to split it.
+    if (strpos($signatureHeader, '=') === false) {
+        debugLog("ERROR: Invalid signature header format");
+        return false;
+    }
+    
+    list($algo, $githubSignature) = explode('=', $signatureHeader, 2);
+    debugLog("DEBUG: Algorithm: " . $algo);
+    debugLog("DEBUG: GitHub signature: " . $githubSignature);
+
+    // Compute the hash of the payload with the secret.
+    $payloadHash = hash_hmac('sha256', $payload, $secret);
+    debugLog("DEBUG: Computed hash: " . $payloadHash);
+
+    // Compare the signatures
+    $matches = hash_equals($githubSignature, $payloadHash);
+    debugLog("DEBUG: Signatures match: " . ($matches ? 'YES' : 'NO'));
+    
+    if (!$matches) {
+        debugLog("ERROR: Signature mismatch");
+        debugLog("Expected: " . $githubSignature);
+        debugLog("Got: " . $payloadHash);
+    }
+    
+    return $matches;
+}
+
+function pullLatestChanges($repoPath = null)
+{
+    $repoPath = $repoPath ?: __DIR__;
+    
+    // Set git config for headless environment
+    putenv('HOME=/tmp');
+    putenv('GIT_ORIGIN=true');
+    
+    // Change to repo directory and pull changes
+    $command = sprintf('cd %s && /usr/bin/git pull origin main 2>&1', escapeshellarg($repoPath));
+    $output = shell_exec($command);
+    
+    debugLog("Git pull output: " . $output);
+    return $output;
+}
+
+function clearProxyCache()
+{
+    $cacheDir = __DIR__ . '/cache';
+    
+    if (is_dir($cacheDir)) {
+        $files = glob($cacheDir . '/*');
+        $deleted = 0;
+        
+        foreach ($files as $file) {
+            if (is_file($file)) {
+                unlink($file);
+                $deleted++;
+            }
+        }
+        
+        debugLog("Cleared {$deleted} cache files from proxy cache");
+    }
+}
+
+function main()
+{
+    global $enableGithubAuthentication, $github_webhook_secret, $enableGitPull, $enableCacheClear;
+
+    debugLog("=== DEBUG WEBHOOK REQUEST ===");
+    debugLog("Request method: " . $_SERVER['REQUEST_METHOD']);
+    debugLog("Headers received:");
+    foreach (getallheaders() as $name => $value) {
+        debugLog("  {$name}: {$value}");
+    }
+    
+    debugLog("Configured secret (first 10 chars): " . substr($github_webhook_secret, 0, 10) . "...");
+
+    if ($enableGithubAuthentication) {
+        if (!isset($_SERVER['HTTP_X_HUB_SIGNATURE_256'])) {
+            debugLog("ERROR: Missing GitHub signature header");
+            debugLog("Available headers: " . implode(', ', array_keys($_SERVER)));
+            http_response_code(400);
+            die('Invalid Request - Missing signature');
+        }
+
+        if (!verifyGithubWebhookSignature($github_webhook_secret)) {
+            debugLog("ERROR: Invalid GitHub signature");
+            http_response_code(403);
+            die('Invalid Signature');
+        }
+        
+        debugLog("GitHub signature verified successfully");
+    }
+
+    // Respond to GitHub with 200 OK immediately
+    http_response_code(200);
+    ignore_user_abort(true);
+    ob_start();
+    echo "Debug webhook received. Processing deployment...";
+    header('Connection: close');
+    header('Content-Length: ' . ob_get_length());
+    echo "<br><br>DEBUG OUTPUT:<br>";
+    
+    debugLog("Starting deployment process");
+
+    if ($enableGitPull) {
+        debugLog("Pulling latest changes from GitHub");
+        pullLatestChanges();
+    }
+
+    if ($enableCacheClear) {
+        debugLog("Clearing proxy cache");
+        clearProxyCache();
+    }
+
+    debugLog("=== Deployment completed ===");
+    
+    header('Content-Length: ' . ob_get_length());
+    ob_end_flush();
+    flush();
+}
+
+main();
+?>
