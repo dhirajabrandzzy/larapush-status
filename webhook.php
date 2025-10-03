@@ -53,9 +53,13 @@ function pullLatestChanges($repoPath = null)
 {
     $repoPath = $repoPath ?: __DIR__;
     
-    // Set git config for headless environment
+    // Set git config for headless environment and safe directory
     putenv('HOME=/tmp');
     putenv('GIT_ORIGIN=true');
+    
+    // Ensure safe directory is set for this repository
+    $safeDirCommand = sprintf('cd %s && git config --global --add safe.directory %s 2>&1', escapeshellarg($repoPath), escapeshellarg($repoPath));
+    shell_exec($safeDirCommand);
     
     // Change to repo directory and pull changes
     $command = sprintf('cd %s && /usr/bin/git pull origin main 2>&1', escapeshellarg($repoPath));
