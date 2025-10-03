@@ -1,4 +1,4 @@
-# Larapush Status CI/CD Setup
+# Larapush Status page CI/CD Setup
 
 This repository contains the necessary files to set up automated deployments for your Larapush status page using GitHub webhooks.
 
