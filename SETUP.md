@@ -176,4 +176,4 @@ ls -la /home/status.larapush.com/public_html/
 2. Monitor the deployment logs to ensure everything is working
 3. Set up monitoring or alerts for failed deployments if needed
 
-
+For any issues, check the deployment logs first - they contain detailed information about what's happening during each deployment.
