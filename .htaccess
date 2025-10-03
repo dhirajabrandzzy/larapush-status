@@ -1,9 +1,0 @@
-# Enable rewrite engine
-RewriteEngine On
-
-# Don’t rewrite existing files or directories
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-
-# Send everything else to index.php
-RewriteRule ^ index.php [L]
