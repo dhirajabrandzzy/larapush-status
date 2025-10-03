@@ -4,6 +4,11 @@
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $query = $_SERVER['QUERY_STRING'] ?? '';
 
+// Skip proxy routing for webhook files
+if (strpos($uri, 'webhook') !== false) {
+    return false; // Let PHP handle the webhook files directly
+}
+
 function proxyRequest($targetUrl, $useCache = false)
 {
     $cacheDir = __DIR__ . '/cache';
