@@ -122,7 +122,7 @@ function pullLatestChanges($repoPath = null)
     debugLog("Git safe directory command output: " . $safeDirOutput);
     
     // Set SSH to use the deploy key specifically with proper permissions
-    $sshCommand = sprintf('cd %s && GIT_SSH_COMMAND="ssh -i /root/.ssh/larapush_deploy_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" /usr/bin/git pull origin main 2>&1', escapeshellarg($repoPath));
+    $sshCommand = sprintf('cd %s && GIT_SSH_COMMAND="ssh -i /var/www/.ssh/larapush_deploy_key -o StrictHostKeyChecking=no" /usr/bin/git pull origin main 2>&1', escapeshellarg($repoPath));
     $output = shell_exec($sshCommand);
     
     debugLog("Git pull output: " . $output);
