@@ -113,16 +113,16 @@ function pullLatestChanges($repoPath = null)
     $repoPath = $repoPath ?: __DIR__;
     
     // Set git config for headless environment and safe directory
-    putenv('HOME=/root'); // Use root's home directory where SSH keys are
+    putenv('HOME=/tmp'); // Use temporary directory for git config
     putenv('GIT_ORIGIN=true');
     
-    // Ensure safe directory is set for this repository
-    $safeDirCommand = sprintf('cd %s && git config --global --add safe.directory %s 2>&1', escapeshellarg($repoPath), escapeshellarg($repoPath));
+    // Ensure safe directory is set for this repository (local config, not global)
+    $safeDirCommand = sprintf('cd %s && git config --local --add safe.directory %s 2>&1', escapeshellarg($repoPath), escapeshellarg($repoPath));
     $safeDirOutput = shell_exec($safeDirCommand);
     debugLog("Git safe directory command output: " . $safeDirOutput);
     
-    // Set SSH to use the deploy key specifically
-    $sshCommand = sprintf('cd %s && GIT_SSH_COMMAND="ssh -i /root/.ssh/larapush_deploy_key -o StrictHostKeyChecking=no" /usr/bin/git pull origin main 2>&1', escapeshellarg($repoPath));
+    // Set SSH to use the deploy key specifically with proper permissions
+    $sshCommand = sprintf('cd %s && GIT_SSH_COMMAND="ssh -i /root/.ssh/larapush_deploy_key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" /usr/bin/git pull origin main 2>&1', escapeshellarg($repoPath));
     $output = shell_exec($sshCommand);
     
     debugLog("Git pull output: " . $output);
