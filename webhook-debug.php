@@ -112,9 +112,19 @@ function pullLatestChanges($repoPath = null)
 {
     $repoPath = $repoPath ?: __DIR__;
     
+    // Debug: Check what user we're running as
+    $whoami = shell_exec('whoami 2>&1');
+    $id = shell_exec('id 2>&1');
+    debugLog("Running as user: " . $whoami);
+    debugLog("User ID info: " . $id);
+    
     // Set git config for headless environment and safe directory
     putenv('HOME=/tmp'); // Use temporary directory for git config
     putenv('GIT_ORIGIN=true');
+    
+    // Check .git directory ownership and permissions
+    $gitStats = shell_exec("ls -la $repoPath/.git/config 2>&1");
+    debugLog(".git/config permissions: " . $gitStats);
     
     // Ensure safe directory is set for this repository (local config, not global)
     $safeDirCommand = sprintf('cd %s && git config --local --add safe.directory %s 2>&1', escapeshellarg($repoPath), escapeshellarg($repoPath));
